@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feris and MU's Diary</title>
+<style>
+/* ============ 基础 ============ */
+*{ margin:0; padding:0; box-sizing:border-box; }
+
+html,body{
+  height:100%;
+  background:#0d0d10;
+  overflow:hidden;
+}
+
+body{
+  font-family:"MS Gothic","MS PGothic","Osaka","SimSun","宋体","Courier New",monospace;
+  -webkit-font-smoothing:none;
+  -moz-osx-font-smoothing:grayscale;
+  font-smooth:never;
+  text-rendering:optimizeSpeed;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#000;
+}
+
+#screen{
+  width:1024px;
+  height:576px;
+  position:relative;
+  flex:0 0 auto;
+  transform-origin:center center;
+  overflow:hidden;
+  background:#000;
+}
+
+/* ============ CRT 滤镜 ============ */
+#crt{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:9999;
+  display:block;
+}
+#crt::before{
+  content:'';
+  position:absolute;
+  inset:-60%;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.55'/></svg>");
+  opacity:.07;
+  animation:noiseShift .14s steps(1) infinite;
+}
+@keyframes noiseShift{
+  0%{ transform:translate(0,0); }
+  20%{ transform:translate(-4%,3%); }
+  40%{ transform:translate(3%,-5%); }
+  60%{ transform:translate(-3%,-2%); }
+  80%{ transform:translate(5%,4%); }
+  100%{ transform:translate(-2%,1%); }
+}
+#crt::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,.22) 0px,
+      rgba(0,0,0,.22) 1px,
+      rgba(0,0,0,0)   1px,
+      rgba(0,0,0,0)   3px
+    ),
+    radial-gradient(ellipse at 50% 50%,
+      rgba(0,0,0,0) 52%,
+      rgba(0,0,0,.18) 78%,
+      rgba(0,0,0,.52) 100%);
+}
+#crt.hidden{ display:none; }
+
+/* ============ 窗口 ============ */
+.window{
+  width:100%;
+  height:100%;
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#dfdfdf #000 #000 #dfdfdf;
+  box-shadow:inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+}
+
+/* ---- 标题栏 ---- */
+.titlebar{
+  height:26px;
+  flex:0 0 auto;
+  background:#000080;
+  display:flex;
+  align-items:center;
+  padding:2px 3px 2px 5px;
+  gap:6px;
+}
+.tb-icon{
+  width:16px; height:16px;
+  background:#c0c0c0;
+  border:1px solid;
+  border-color:#fff #808080 #808080 #fff;
+  position:relative;
+  flex:0 0 auto;
+}
+.tb-icon::after{
+  content:'';
+  position:absolute;
+  left:4px; top:4px;
+  width:6px; height:6px;
+  background:#e06fa0;
+  box-shadow:2px 2px 0 #3b5fa8;
+}
+.tb-title{
+  color:#fff;
+  font-size:13px;
+  font-weight:bold;
+  letter-spacing:1px;
+  flex:1;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.tb-controls{ display:flex; gap:2px; flex:0 0 auto; }
+.tbtn{
+  width:18px; height:16px;
+  background:#c0c0c0;
+  border:1px solid;
+  border-color:#ffffff #000000 #000000 #ffffff;
+  box-shadow:inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080;
+  font-size:10px;
+  line-height:13px;
+  text-align:center;
+  color:#000;
+  font-weight:bold;
+  cursor:pointer;
+  user-select:none;
+  font-family:inherit;
+  padding:0;
+}
+.tbtn:active{
+  border-color:#000000 #ffffff #ffffff #000000;
+  box-shadow:inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf;
+}
+
+/* ---- 菜单栏 ---- */
+.menubar{
+  height:22px;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  padding:0 6px;
+  font-size:12px;
+  font-weight:bold;
+  color:#000;
+  border-bottom:1px solid #808080;
+  box-shadow:0 1px 0 #ffffff;
+  letter-spacing:.5px;
+}
+
+/* ---- 主区 ---- */
+.main{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  gap:8px;
+  padding:8px;
+}
+
+.leftcol{
+  flex:1 1 auto;
+  min-width:0;
+  display:flex;
+}
+
+.rightcol{
+  width:340px;
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+/* ---- 剧情面板 ---- */
+.story-panel{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  background:#7ea6dd;
+  border:4px solid #f2a7c3;
+  padding:4px;
+  box-shadow:inset 0 0 0 1px #b56a90;
+}
+.story-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  background:#f7f0dc;
+  overflow-y:scroll;
+  overflow-x:hidden;
+  padding:10px 12px;
+  cursor:pointer;
+  box-shadow:inset 2px 2px 0 #b9ad8c, inset -2px -2px 0 #ffffff;
+}
+.story-lines{
+  display:block;
+}
+.line{
+  font-size:17px;
+  line-height:32px;
+  font-weight:bold;
+  color:#141414;
+  white-space:pre-wrap;
+  word-break:break-word;
+  letter-spacing:.4px;
+  min-height:32px;
+}
+.line .sys{ color:#5a5a5a; }
+.line .quote{ color:#6b4423; }
+.line .paren{ font-style:italic; color:#2b2b2b; }
+
+/* ---- 像素滚动条 ---- */
+.story-scroll::-webkit-scrollbar{ width:16px; }
+.story-scroll::-webkit-scrollbar-track{
+  background:#ded9c8;
+  border-left:1px solid #808080;
+}
+.story-scroll::-webkit-scrollbar-thumb{
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #808080 #808080 #ffffff;
+}
+.story-scroll::-webkit-scrollbar-thumb:active{
+  border-color:#808080 #ffffff #ffffff #808080;
+}
+.story-scroll::-webkit-scrollbar-button:single-button{
+  background:#c0c0c0;
+  height:15px;
+  border:2px solid;
+  border-color:#ffffff #808080 #808080 #ffffff;
+}
+
+/* ---- 任务面板 ---- */
+.task-panel{
+  flex:0 0 auto;
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #808080 #808080 #ffffff;
+  box-shadow:inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #000000;
+  display:flex;
+  flex-direction:column;
+}
+.task-title{
+  height:24px;
+  flex:0 0 auto;
+  background:#e08cb4;
+  color:#ffffff;
+  font-size:13px;
+  font-weight:bold;
+  letter-spacing:2px;
+  display:flex;
+  align-items:center;
+  padding:0 8px;
+  border-bottom:2px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  text-shadow:1px 1px 0 #a0506f;
+}
+.task-body{
+  flex:1 1 auto;
+  min-height:96px;
+  max-height:150px;
+  overflow-y:auto;
+  background:#fdf4f8;
+  margin:4px;
+  padding:8px;
+  border:2px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  font-size:14px;
+  line-height:22px;
+  font-weight:bold;
+  color:#3355aa;
+  word-break:break-word;
+  letter-spacing:.5px;
+}
+.task-body::-webkit-scrollbar{ width:12px; }
+.task-body::-webkit-scrollbar-track{ background:#e8e0e4; }
+.task-body::-webkit-scrollbar-thumb{
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #808080 #808080 #ffffff;
+}
+
+/* ---- 按钮列 ---- */
+.btncol{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.pbtn{
+  width:100%;
+  height:46px;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 12px;
+  background:#c0c0c0;
+  color:#000;
+  font-family:inherit;
+  font-size:15px;
+  font-weight:bold;
+  letter-spacing:2px;
+  border:2px solid;
+  border-color:#ffffff #000000 #000000 #ffffff;
+  box-shadow:inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080;
+  cursor:pointer;
+  user-select:none;
+  outline:none;
+}
+.pbtn:active{
+  border-color:#000000 #ffffff #ffffff #000000;
+  box-shadow:inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf;
+  padding-top:2px;
+  padding-left:14px;
+}
+.pbtn.active{
+  border-color:#000000 #ffffff #ffffff #000000;
+  box-shadow:inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf;
+  background:#d8d8d8;
+}
+.pbtn svg{
+  width:16px;
+  height:16px;
+  flex:0 0 auto;
+  fill:#000;
+  shape-rendering:crispEdges;
+  image-rendering:pixelated;
+}
+
+/* ---- 状态栏 ---- */
+.statusbar{
+  height:24px;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 10px;
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:1px;
+  color:#000;
+  border-top:1px solid #ffffff;
+  box-shadow:inset 0 1px 0 #808080;
+  background:#c0c0c0;
+}
+.statusbar .sb-cell{
+  border:1px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  padding:0 8px;
+  height:18px;
+  display:flex;
+  align-items:center;
+  line-height:16px;
+}
+
+/* ============ 弹窗 ============ */
+.overlay{
+  position:absolute;
+  inset:0;
+  z-index:10000;
+  background:rgba(0,0,0,.30);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+.overlay.show{ display:flex; }
+
+.dialog{
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#dfdfdf #000000 #000000 #dfdfdf;
+  box-shadow:inset 1px 1px 0 #ffffff, inset -1px -1px 0 #808080;
+  display:flex;
+  flex-direction:column;
+  max-height:520px;
+  min-width:340px;
+}
+.dialog-titlebar{
+  height:24px;
+  flex:0 0 auto;
+  background:#000080;
+  display:flex;
+  align-items:center;
+  padding:2px 3px 2px 6px;
+  gap:6px;
+}
+.dialog-titlebar span{
+  color:#fff;
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:1px;
+  flex:1;
+}
+.dialog-body{
+  padding:12px;
+  overflow-y:auto;
+  font-size:13px;
+  font-weight:bold;
+  color:#000;
+}
+.dialog-body::-webkit-scrollbar{ width:16px; }
+.dialog-body::-webkit-scrollbar-track{ background:#dedede; border-left:1px solid #808080; }
+.dialog-body::-webkit-scrollbar-thumb{
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #808080 #808080 #ffffff;
+}
+
+/* ---- 设置行 ---- */
+.set-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+  min-height:22px;
+}
+.set-label{
+  width:96px;
+  flex:0 0 auto;
+  font-size:13px;
+  letter-spacing:1px;
+}
+.set-val{
+  width:34px;
+  flex:0 0 auto;
+  text-align:center;
+  background:#ffffff;
+  border:2px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  font-size:12px;
+  line-height:18px;
+  height:22px;
+}
+.set-sep{
+  height:2px;
+  margin:6px 0 12px;
+  border-top:1px solid #808080;
+  border-bottom:1px solid #ffffff;
+}
+.set-row.btns{ justify-content:flex-end; gap:10px; margin-bottom:0; }
+
+/* ---- 滑块 ---- */
+input[type=range]{
+  -webkit-appearance:none;
+  appearance:none;
+  flex:1 1 auto;
+  height:20px;
+  background:transparent;
+  outline:none;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:6px;
+  background:#7d7d7d;
+  border:1px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:11px;
+  height:20px;
+  margin-top:-8px;
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #000000 #000000 #ffffff;
+  box-shadow:inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080;
+}
+input[type=range]::-moz-range-track{
+  height:6px;
+  background:#7d7d7d;
+  border:1px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+}
+input[type=range]::-moz-range-thumb{
+  width:9px;
+  height:18px;
+  border-radius:0;
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #000000 #000000 #ffffff;
+}
+
+/* ---- 复选框 ---- */
+.chk{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  font-size:13px;
+  letter-spacing:.5px;
+}
+input[type=checkbox]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:14px;
+  height:14px;
+  flex:0 0 auto;
+  background:#ffffff;
+  border:2px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  position:relative;
+  cursor:pointer;
+  margin:0;
+}
+input[type=checkbox]:checked::after{
+  content:'✔';
+  position:absolute;
+  left:-1px;
+  top:-5px;
+  font-size:13px;
+  line-height:14px;
+  color:#000;
+  font-weight:bold;
+}
+
+/* ---- 通用小按钮 ---- */
+.sbtn{
+  min-width:62px;
+  height:24px;
+  padding:0 10px;
+  background:#c0c0c0;
+  border:2px solid;
+  border-color:#ffffff #000000 #000000 #ffffff;
+  box-shadow:inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080;
+  font-family:inherit;
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:1px;
+  color:#000;
+  cursor:pointer;
+  user-select:none;
+  outline:none;
+}
+.sbtn:active{
+  border-color:#000000 #ffffff #ffffff #000000;
+  box-shadow:inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf;
+  padding-top:2px;
+}
+.sbtn:disabled{
+  color:#808080;
+  text-shadow:1px 1px 0 #ffffff;
+  cursor:default;
+}
+
+/* ---- 存档槽位 ---- */
+.slot-list{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.slot{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:#dfdfdf;
+  border:2px solid;
+  border-color:#808080 #ffffff #ffffff #808080;
+  padding:4px 6px;
+}
+.slot-no{
+  width:28px;
+  flex:0 0 auto;
+  text-align:center;
+  font-size:14px;
+  color:#000080;
+  letter-spacing:1px;
+}
+.slot-info{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:11px;
+  line-height:16px;
+  color:#000;
+}
+.slot-line{ color:#000080; letter-spacing:.5px; }
+.slot-prev{
+  color:#6b4423;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:280px;
+}
+.slot-empty{ color:#808080; letter-spacing:1px; }
+.slot-acts{ display:flex; gap:4px; flex:0 0 auto; }
+.slot-acts .sbtn{ min-width:46px; height:22px; font-size:11px; padding:0 6px; }
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div class="window">
+
+    <!-- 标题栏 -->
+    <div class="titlebar">
+      <div class="tb-icon"></div>
+      <div class="tb-title">Feris and MU's Diary</div>
+      <div class="tb-controls">
+        <div class="tbtn" data-win="min" title="最小化">_</div>
+        <div class="tbtn" data-win="max" title="最大化">□</div>
+        <div class="tbtn" data-win="close" title="关闭">✕</div>
+      </div>
+    </div>
+
+    <!-- 菜单栏 -->
+    <div class="menubar">2711loveforever</div>
+
+    <!-- 主体 -->
+    <div class="main">
+      <div class="leftcol">
+        <div class="story-panel">
+          <div class="story-scroll" id="storyScroll">
+            <div class="story-lines" id="storyLines"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rightcol">
+        <!-- 任务面板 -->
+        <div class="task-panel">
+          <div class="task-title">◆ TASK</div>
+          <div class="task-body" id="taskBody">
+            <div id="taskText">— 等待任务发布 —</div>
+          </div>
+        </div>
+
+        <!-- 按钮组 -->
+        <div class="btncol">
+          <button class="pbtn" id="btnSettings">
+            <svg viewBox="0 0 8 8"><rect x="0" y="1" width="8" height="1"/><rect x="5" y="0" width="2" height="3"/><rect x="0" y="5" width="8" height="1"/><rect x="1" y="4" width="2" height="3"/></svg>
+            <span>设 置</span>
+          </button>
+
+          <button class="pbtn" id="btnPrev">
+            <svg viewBox="0 0 8 8"><rect x="6" y="1" width="1" height="6"/><rect x="5" y="2" width="1" height="4"/><rect x="4" y="3" width="1" height="2"/><rect x="3" y="3" width="1" height="2"/><rect x="2" y="4" width="1" height="2"/><rect x="1" y="4" width="1" height="1"/></svg>
+            <span>上一句</span>
+          </button>
+
+          <button class="pbtn" id="btnNext">
+            <svg viewBox="0 0 8 8"><rect x="1" y="1" width="1" height="6"/><rect x="2" y="2" width="1" height="4"/><rect x="3" y="3" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="4" width="1" height="2"/><rect x="6" y="4" width="1" height="1"/></svg>
+            <span>下一句</span>
+          </button>
+
+          <button class="pbtn" id="btnAuto">
+            <svg viewBox="0 0 8 8"><rect x="1" y="1" width="2" height="6"/><rect x="4" y="1" width="1" height="6"/><rect x="5" y="2" width="1" height="4"/><rect x="6" y="3" width="1" height="2"/></svg>
+            <span>自动播放</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="statusbar">
+      <div class="sb-cell">LUMU</div>
+      <div class="sb-cell" id="pageInfo">1 / 110</div>
+    </div>
+
+  </div>
+
+  <!-- 弹窗层 -->
+  <div class="overlay" id="overlay">
+    <div class="dialog" id="dialog">
+      <div class="dialog-titlebar">
+        <span id="dialogTitle">设置</span>
+        <div class="tbtn" id="dialogClose">✕</div>
+      </div>
+      <div class="dialog-body" id="dialogBody"></div>
+    </div>
+  </div>
+
+  <!-- CRT 滤镜层 -->
+  <div id="crt"></div>
+</div>
+
+<script>
+/* =====================================================================
+   Feris and MU's Diary  —  像素风文字冒险引擎
+   ===================================================================== */
+
+/* ---------------- 剧情文本（虚拟内容） ---------------- */
+const LINES = [
+"（穆祉丞家中.清晨）",
+"（穆祉丞苏醒了）",
+"（穆祉丞起身 准备上厕所）",
+"（穆祉丞脱下了裤子）",
+"（穆祉丞感受到了不对劲）",
+"穆祉丞：？",
+"穆祉丞：？？？？",
+"穆祉丞：啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊！！！！！！！",
+"（穆祉丞解锁新成就：坤吧消失化贝塔）",
+"（穆祉丞颤抖着手拿起了手机，试图求救百度）",
+"（穆祉丞看到手机上出现了神秘app）",
+"（穆祉丞点击了APP）",
+"【亲爱的用户您好呀~】",
+"【欢迎您使用养花APP~完成任务可以获得奖励，不做任务会收到奇怪的惩罚哦~】",
+"【现在请您完成第一个任务吧~】",
+"【请您在24小时内，给您的湿地王橹杰介绍您的新器官~】",
+"（与此同时 王橹杰家中）",
+"（王橹杰苏醒了）",
+"（王橹杰拿起手机 准备先刷刷手机）",
+"（王橹杰发现手机上出现了神秘app）",
+"【亲爱的用户您好呀~】",
+"【欢迎您使用养花APP~完成任务可以获得奖励，不做任务会收到奇怪的惩罚哦~】",
+"【现在请您完成第一个任务吧~】",
+"【请您在24小时内，和您的湿兄穆祉丞一起观花~】",
+"王橹杰：？",
+"王橹杰：哪来的奇怪软件，找哥哥确定一下吧",
+"（王橹杰点开了微信里和穆祉丞的聊天对话框）",
+"“得意黑：哥哥，公司是出了什么新活动拍摄任务吗？我手机上出现了一个奇怪东西，说什么要让我和你一起观花”",
+"“得意黑：你知道这个花是什么吗？我们要带上什么拍摄设备么੭ ᐕ)੭”",
+"（穆祉丞正在呆滞地啃食早餐）",
+"（穆祉丞收到了王橹杰发来的消息，两眼一黑，决定开始装傻）",
+"“Ca1mzzz：啊哈哈橹杰呃，我也不太清楚，可能是后面的族综安排什么的吧”",
+"（穆祉丞并不打算把这件事情告诉王橹杰，他的脑子里闪过了一些神秘同人作品的情节）",
+"（在隐隐的不安中，王橹杰和穆祉丞度过了平静的一天。）",
+"（似乎并没有什么疯狂的事情发生，除了他们险些忘记续上抖音火花。）",
+"（穆祉丞在睡前露出了得意的笑容，他想看来任务不做也很安全）",
+"（穆祉丞飞速陷入了昏睡）",
+"（穆祉丞猛地睁眼，发现自己被安在另一个穆祉丞的身体里。）",
+"（而这个穆祉丞正骑在王橹杰身上，和他一起运动）",
+"穆祉丞：啊......橹橹......老公......好爽......",
+"王橹杰：哥哥......宝宝......",
+"（王橹杰同样进入到了这个王橹杰的身上）",
+"（在王橹杰本人的惊恐夹杂着愉悦下，他的手重重拍到了穆祉丞的猪臀上）",
+"王橹杰：哥哥宝宝是不是很喜欢被我拍？嗯？",
+"穆祉丞：喜欢......橹橹......",
+"（闹钟惊醒了睡梦里的二人）",
+"【叮咚～系统温馨提示您】",
+"【如果不认真完成任务，睡梦里会一直给您带来甜蜜的享受哦～】",
+"（穆祉丞有些被任务剧情惹恼了）",
+"（穆祉丞决定和王橹杰一起把任务完成）",
+"“Ca1mzzz：橹杰，今天晚上来我家一趟”",
+"（王橹杰很惊喜）",
+"“得意黑：好的哥哥(ᕑᗢᓫ∗)”",
+"（长江国际-练习室内）",
+"（王橹杰终于熬过了和同事一起拍摄物料的漫长时刻，正在收拾包）",
+"丑同事：穆师兄好！",
+"（王橹杰猛地抬头，看到穆祉丞站在练习室门口，手里甩弄着车钥匙）",
+"（王橹杰正想打招呼，却看到穆祉丞一脸冷漠，只对他抬了抬下巴，示意跟着走）",
+"（一路无言）",
+"（王橹杰正准备去拉后座车门）",
+"穆祉丞：坐副座。",
+"王橹杰：！",
+"王橹杰：哥哥......",
+"（王橹杰放下了心，意识到穆祉丞并不是对自己生气）",
+"（穆祉丞家中）",
+"（两人在沙发上坐下）",
+"（沉默片刻，王橹杰决定还是先开口）",
+"王橹杰：哥哥，那个任务要怎么做啊？需要录像吗？",
+"王橹杰：以防万一，我给拍立得都带上了。",
+"（穆祉丞的脸迅速变红，五官扭曲）",
+"（穆祉丞猛地站起了身）",
+"（穆祉丞对着王橹杰一把拽下了裤子）",
+"穆祉丞：任务......任务呃......要介绍的是......我不知道怎么长出来的这个东西......",
+"（王橹杰呆住了）",
+"（王橹杰的脑海里在那一秒内划过了很多东西）",
+"（穆祉丞为什么对着我脱裤子了呃好白的大腿好小的xx呃等等等等这里长了个什么东西这是现实世界可以发生的吗然后呢我看到了穆祉丞的这个我们是不是就要直接结婚了呀到时候婚礼就瞒着公司里的人办吧然后呢重庆办一个成都办一个再要不要去冰岛办一个.......）",
+"（王橹杰盯着穆祉丞的女比陷入了沉思）",
+"（王橹杰后知后觉意识到昨晚的梦好像并不是他压抑过度的结果。）",
+"（穆祉丞以为王橹杰的呆滞是无法接受眼前的一切）",
+"（穆祉丞感到尴尬，伸手准备提起裤子，王橹杰眼疾手快按住了他的手）",
+"王橹杰：……所以，哥哥你怎么介绍它？介绍.....这个，花？",
+"（穆祉丞光着屁股尬住了）",
+"（盗版系统，毁我青春，也没给个任务提示词啊！）",
+"（穆祉丞迅速回忆了一些带货经验，自信准备开始）",
+"穆祉丞：呃......这个器官是女性的生殖器官，然后，这个最外面叫做阴唇，再往里是阴道部分，然后……最上面……是……",
+"（穆祉丞顶着王橹杰直白灼热的视线，声音越来越小，终于磕磕巴巴说完了这一切）",
+"（穆祉丞顾不上拉裤子，赶紧拿起手机检查进度）",
+"【目前任务进度完成了70%~】",
+"【小TIPS~触摸行为可以让学习更为深刻哦～】",
+"（穆祉丞深呼吸了十下，才忍住把手机丢出去的冲动）",
+"（穆祉丞看向王橹杰）",
+"（王橹杰正眼神纯良如羊驼，裤裆平坦似君子，面比而不慌，可谓10后最善红领巾男孩）",
+"（穆祉丞放心了）",
+"（大男子家家的，摸摸又怎样呢？）",
+"（五分钟后）",
+"（穆祉丞顾不上身下那一摊水迹，颤抖着大腿瘫软在了沙发上）",
+"（穆祉丞在反思自己为何引狼入室，在他清楚狼有什么心思的前提下）",
+"（王橹杰沉默着坐在一旁）",
+"（王橹杰获得成就——金手指大师）",
+"（王橹杰忽然想起了什么，抽纸试图去擦拭干净穆祉丞的下体）",
+"穆祉丞：你......唉算了，你擦吧，轻一点。",
+"（穆祉丞再张开了一点腿）",
+"（忍着王橹杰呼出的热气喷在他腿上的诡异感，穆祉丞打开了手机）",
+"（穆祉丞两眼一黑，气晕了过去）",
+"王橹杰：！！！！！",
+"王橹杰：哥哥你怎么了！",
+"（穆祉丞打起了香甜的猪呼噜，王橹杰放心了）",
+"（王橹杰看到了穆祉丞的手机屏幕）",
+"【恭喜您完成了第一日的任务~】",
+"【第二日任务预告~爱情在升温，到了用嘴品尝花蜜的好日子~】"
+];
+
+/* ---------------- 元素引用 ---------------- */
+const $  = (id) => document.getElementById(id);
+const els = {
+  screen:      $('screen'),
+  storyScroll: $('storyScroll'),
+  storyLines:  $('storyLines'),
+  taskText:    $('taskText'),
+  pageInfo:    $('pageInfo'),
+  btnPrev:     $('btnPrev'),
+  btnNext:     $('btnNext'),
+  btnAuto:     $('btnAuto'),
+  btnSettings: $('btnSettings'),
+  overlay:     $('overlay'),
+  dialog:      $('dialog'),
+  dialogTitle: $('dialogTitle'),
+  dialogBody:  $('dialogBody'),
+  dialogClose: $('dialogClose'),
+  crt:         $('crt')
+};
+
+/* ---------------- 状态 ---------------- */
+const state = {
+  idx: 0,
+  task: '',
+  autoPlay: false,
+  typing: false,
+  speed: 60,          // 0~100，越大越快
+  clickVol: 0.55,
+  bgmVol: 0.30,
+  crt: true
+};
+
+let typerTimer = null;
+let typerSkip  = null;
+let autoTimer  = null;
+
+/* ---------------- 工具 ---------------- */
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+  ));
+}
+
+function typeDelay(){
+  return Math.max(8, Math.round(160 - state.speed * 1.5));
+}
+
+/* ---------------- 文本分段解析 ---------------- */
+function splitSegments(text){
+  const segs = [];
+  const re = /【[^】]*】|“[^”]*”|（[^）]*）/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null){
+    if (m.index > last) segs.push({ text: text.slice(last, m.index), cls: '' });
+    const t = m[0];
+    let cls = '';
+    if (t[0] === '【')      cls = 'sys';
+    else if (t[0] === '“')  cls = 'quote';
+    else                    cls = 'paren';
+    segs.push({ text: t, cls });
+    last = m.index + t.length;
+  }
+  if (last < text.length) segs.push({ text: text.slice(last), cls: '' });
+  if (!segs.length) segs.push({ text: '', cls: '' });
+  return segs;
+}
+
+function buildLineEl(text){
+  const div = document.createElement('div');
+  div.className = 'line';
+  splitSegments(text).forEach(seg => {
+    const sp = document.createElement('span');
+    if (seg.cls) sp.className = seg.cls;
+    sp.textContent = seg.text;
+    div.appendChild(sp);
+  });
+  return div;
+}
+
+/* ---------------- 打字机 ---------------- */
+function scrollBottom(){
+  els.storyScroll.scrollTop = els.storyScroll.scrollHeight;
+}
+
+function typeOut(lineEl, done){
+  const spans = Array.from(lineEl.children);
+  const full  = spans.map(s => s.textContent);
+  spans.forEach(s => { s.textContent = ''; });
+
+  if (typerTimer){ clearInterval(typerTimer); typerTimer = null; }
+  state.typing = true;
+
+  let si = 0, ci = 0;
+  let finished = false;
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (typerTimer){ clearInterval(typerTimer); typerTimer = null; }
+    for (let i = 0; i < spans.length; i++) spans[i].textContent = full[i];
+    state.typing = false;
+    typerSkip = null;
+    scrollBottom();
+    if (typeof done === 'function') done();
+  };
+
+  typerSkip = finish;
+
+  typerTimer = setInterval(() => {
+    // 跳过空段
+    while (si < full.length && ci >= full[si].length){ si++; ci = 0; }
+    if (si >= full.length){ finish(); return; }
+    spans[si].textContent += full[si][ci];
+    ci++;
+    scrollBottom();
+  }, typeDelay());
+}
+
+/* ---------------- 渲染 ---------------- */
+function renderLog(animateLast, onTyped){
+  els.storyLines.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (let k = 0; k <= state.idx; k++){
+    frag.appendChild(buildLineEl(LINES[k]));
+  }
+  els.storyLines.appendChild(frag);
+
+  const lastEl = els.storyLines.lastElementChild;
+  if (animateLast && lastEl){
+    typeOut(lastEl, () => { onTyped && onTyped(); });
+  } else {
+    scrollBottom();
+    onTyped && onTyped();
+  }
+}
+
+function updateTask(){
+  let t = '';
+  for (let k = 0; k <= state.idx; k++){
+    const ms = LINES[k].match(/【([^】]*)】/g);
+    if (ms) t = ms[ms.length - 1].slice(1, -1);
+  }
+  state.task = t;
+  els.taskText.textContent = t || '— 等待任务发布 —';
+}
+
+function updatePage(){
+  els.pageInfo.textContent = (state.idx + 1) + ' / ' + LINES.length;
+}
+
+/* ---------------- 前进 / 后退 ---------------- */
+function goNext(){
+  if (state.idx >= LINES.length - 1) return false;
+  state.idx++;
+  updateTask();
+  updatePage();
+  renderLog(false);
+  return true;
+}
+
+function goPrev(){
+  if (state.idx <= 0) return;
+  if (typerSkip){ typerSkip(); }
+  state.idx--;
+  updateTask();
+  updatePage();
+  renderLog(false);
+}
+
+/* ---------------- 自动播放 ---------------- */
+function scheduleAuto(){
+  clearTimeout(autoTimer);
+  if (!state.autoPlay) return;
+  autoTimer = setTimeout(() => {
+    if (!state.autoPlay) return;
+    if (state.idx >= LINES.length - 1){ setAutoPlay(false); return; }
+    state.idx++;
+    updateTask();
+    updatePage();
+    renderLog(true, scheduleAuto);
+  }, 1000);
+}
+
+function setAutoPlay(on){
+  if (on && state.idx >= LINES.length - 1) on = false;
+
+  state.autoPlay = on;
+  els.btnAuto.classList.toggle('active', on);
+  els.btnAuto.querySelector('span').textContent = on ? '暂停播放' : '自动播放';
+
+  if (on){
+    clearTimeout(autoTimer);
+    if (typerSkip) typerSkip();
+    state.idx++;
+    updateTask();
+    updatePage();
+    renderLog(true, scheduleAuto);
+  } else {
+    clearTimeout(autoTimer);
+    autoTimer = null;
+    if (typerSkip) typerSkip();
+  }
+}
+
+/* ---------------- 音频（8-bit） ---------------- */
+let AC = null;
+function initAudio(){
+  if (AC) return AC;
+  try{
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    startBgm();
+  }catch(e){ AC = null; }
+  return AC;
+}
+
+function playClick(){
+  const ac = initAudio();
+  if (!ac || state.clickVol <= 0) return;
+  const t = ac.currentTime;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(1180, t);
+  o.frequency.setValueAtTime(760, t + 0.018);
+  g.gain.setValueAtTime(Math.max(0.0001, 0.09 * state.clickVol), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + 0.07);
+}
+
+/* --- 简易 chiptune 循环 --- */
+const MEL  = [76,79,81,79, 76,74,72,74, 76,76,74,72, 74,76,79,81];
+const BASS = [48,48,45,45, 41,41,43,43, 48,48,45,45, 43,43,41,41];
+let bgmStep = 0;
+let bgmInterval = null;
+
+function midiToFreq(n){ return 440 * Math.pow(2, (n - 69) / 12); }
+
+function playNote(midi, dur, type, vol){
+  const ac = AC;
+  if (!ac) return;
+  const t = ac.currentTime;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(midiToFreq(midi), t);
+  g.gain.setValueAtTime(Math.max(0.0001, vol), t);
+  g.gain.setValueAtTime(Math.max(0.0001, vol), t + dur * 0.55);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+function bgmTick(){
+  if (!AC) return;
+  if (state.bgmVol > 0.001){
+    playNote(MEL[bgmStep % MEL.length], 0.16, 'square', 0.035 * state.bgmVol);
+    if (bgmStep % 2 === 0){
+      playNote(BASS[(bgmStep / 2) % BASS.length], 0.26, 'triangle', 0.060 * state.bgmVol);
+    }
+  }
+  bgmStep++;
+}
+
+function startBgm(){
+  if (bgmInterval) return;
+  bgmInterval = setInterval(bgmTick, 155);
+}
+
+/* ---------------- 设置弹窗 ---------------- */
+function openDialog(title, html, width){
+  els.dialogTitle.textContent = title;
+  els.dialogBody.innerHTML = html;
+  els.dialog.style.width = (width || 470) + 'px';
+  els.overlay.classList.add('show');
+}
+
+function closeDialog(){
+  els.overlay.classList.remove('show');
+  els.dialogBody.innerHTML = '';
+}
+
+function openSettings(){
+  const html = `
+    <div class="set-row">
+      <span class="set-label">点击音效</span>
+      <input type="range" id="rngClick" min="0" max="100" value="${Math.round(state.clickVol*100)}">
+      <span class="set-val" id="valClick">${Math.round(state.clickVol*100)}</span>
+    </div>
+    <div class="set-row">
+      <span class="set-label">背景音乐</span>
+      <input type="range" id="rngBgm" min="0" max="100" value="${Math.round(state.bgmVol*100)}">
+      <span class="set-val" id="valBgm">${Math.round(state.bgmVol*100)}</span>
+    </div>
+    <div class="set-row">
+      <span class="set-label">打字速度</span>
+      <input type="range" id="rngSpeed" min="0" max="100" value="${state.speed}">
+      <span class="set-val" id="valSpeed">${state.speed}</span>
+    </div>
+    <div class="set-row">
+      <span class="set-label">CRT 滤镜</span>
+      <label class="chk">
+        <input type="checkbox" id="chkCrt" ${state.crt ? 'checked' : ''}>
+        <span>扫描线 / 暗角 / 噪点</span>
+      </label>
+    </div>
+    <div class="set-sep"></div>
+    <div class="set-row btns">
+      <button class="sbtn" id="btnSaveDlg">存 档</button>
+      <button class="sbtn" id="btnLoadDlg">读 档</button>
+    </div>
+  `;
+  openDialog('设置', html, 480);
+
+  const rngClick = $('rngClick');
+  const rngBgm   = $('rngBgm');
+  const rngSpeed = $('rngSpeed');
+  const chkCrt   = $('chkCrt');
+
+  rngClick.addEventListener('input', e => {
+    state.clickVol = e.target.value / 100;
+    $('valClick').textContent = e.target.value;
+    initAudio();
+  });
+  rngBgm.addEventListener('input', e => {
+    state.bgmVol = e.target.value / 100;
+    $('valBgm').textContent = e.target.value;
+    initAudio();
+  });
+  rngSpeed.addEventListener('input', e => {
+    state.speed = Number(e.target.value);
+    $('valSpeed').textContent = e.target.value;
+  });
+  chkCrt.addEventListener('change', e => {
+    state.crt = e.target.checked;
+    els.crt.classList.toggle('hidden', !state.crt);
+  });
+
+  $('btnSaveDlg').addEventListener('click', () => openSlots('save'));
+  $('btnLoadDlg').addEventListener('click', () => openSlots('load'));
+}
+
+/* ---------------- 存档系统 ---------------- */
+const SAVE_KEY = 'feris_mu_saves_v1';
+let SAVES = {};
+try{
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) SAVES = JSON.parse(raw) || {};
+}catch(e){ SAVES = {}; }
+
+function persistSaves(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(SAVES)); }catch(e){}
+}
+
+function openSlots(mode){
+  const isSave = (mode === 'save');
+  let html = '<div class="slot-list">';
+  for (let i = 0; i < 10; i++){
+    const s = SAVES[i];
+    html += '<div class="slot">';
+    html += '<div class="slot-no">' + String(i + 1).padStart(2, '0') + '</div>';
+    html += '<div class="slot-info">';
+    if (s){
+      html += '<div class="slot-line">第 ' + (s.idx + 1) + ' 句 · ' + esc(s.time) + '</div>';
+      html += '<div class="slot-prev">' + esc(s.preview) + '</div>';
+    } else {
+      html += '<div class="slot-empty">— 空存档位 —</div>';
+    }
+    html += '</div>';
+    html += '<div class="slot-acts">';
+    if (isSave){
+      html += '<button class="sbtn" data-act="save" data-i="' + i + '">保存</button>';
+    } else {
+      html += '<button class="sbtn" data-act="load" data-i="' + i + '"' + (s ? '' : ' disabled') + '>读取</button>';
+    }
+    if (s){
+      html += '<button class="sbtn" data-act="del" data-i="' + i + '">删除</button>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  openDialog(isSave ? '存档' : '读档', html, 540);
+
+  els.dialogBody.querySelectorAll('.sbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      const i = Number(btn.dataset.i);
+
+      if (act === 'save'){
+        SAVES[i] = {
+          idx: state.idx,
+          task: state.task,
+          time: new Date().toLocaleString('zh-CN', { hour12: false }),
+          preview: LINES[state.idx].slice(0, 22)
+        };
+        persistSaves();
+        openSlots('save');
+      }
+      else if (act === 'load'){
+        const s = SAVES[i];
+        if (!s) return;
+        if (typerSkip) typerSkip();
+        state.idx = Math.max(0, Math.min(s.idx, LINES.length - 1));
+        updateTask();
+        updatePage();
+        renderLog(false);
+        closeDialog();
+      }
+      else if (act === 'del'){
+        delete SAVES[i];
+        persistSaves();
+        openSlots(isSave ? 'save' : 'load');
+      }
+    });
+  });
+}
+
+/* ---------------- 事件绑定 ---------------- */
+function bindEvents(){
+
+  /* 剧情框点击推进 */
+  els.storyScroll.addEventListener('click', (e) => {
+    const r = els.storyScroll.getBoundingClientRect();
+    const scale = r.width / els.storyScroll.offsetWidth;
+    const sbW = 16 * scale;
+    if (e.clientX > r.right - sbW) return;   // 点在滚动条上
+
+    if (typerSkip){ typerSkip(); return; }
+    if (state.autoPlay){ setAutoPlay(false); return; }
+    goNext();
+  });
+
+  /* 上一句 */
+  els.btnPrev.addEventListener('click', () => {
+    if (state.autoPlay) setAutoPlay(false);
+    goPrev();
+  });
+
+  /* 下一句 */
+  els.btnNext.addEventListener('click', () => {
+    if (typerSkip){ typerSkip(); return; }
+    if (state.autoPlay){ setAutoPlay(false); return; }
+    goNext();
+  });
+
+  /* 自动播放 */
+  els.btnAuto.addEventListener('click', () => {
+    setAutoPlay(!state.autoPlay);
+  });
+
+  /* 设置 */
+  els.btnSettings.addEventListener('click', () => {
+    openSettings();
+  });
+
+  /* 弹窗关闭 */
+  els.dialogClose.addEventListener('click', closeDialog);
+  els.overlay.addEventListener('click', (e) => {
+    if (e.target === els.overlay) closeDialog();
+  });
+
+  /* 窗口控件 */
+  document.querySelectorAll('.tbtn[data-win]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.win;
+      if (kind === 'min'){
+        openDialog('提示', '<div style="padding:6px 4px;line-height:22px;">这个窗口已经最小化到你的心里啦～</div>', 340);
+      } else if (kind === 'max'){
+        openDialog('提示', '<div style="padding:6px 4px;line-height:22px;">已经最大化——现在满屏都是粉蓝色。</div>', 340);
+      } else {
+        openDialog('提示', '<div style="padding:6px 4px;line-height:22px;">剧情还没播完，不能关闭窗口哦～<br>（其实关了也会被任务拉回来的）</div>', 380);
+      }
+    });
+  });
+
+  /* 键盘快捷键 */
+  document.addEventListener('keydown', (e) => {
+    if (els.overlay.classList.contains('show')) return;
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter'){
+      e.preventDefault();
+      if (typerSkip){ typerSkip(); return; }
+      if (state.autoPlay){ setAutoPlay(false); return; }
+      goNext();
+    } else if (e.key === 'ArrowLeft'){
+      e.preventDefault();
+      if (state.autoPlay) setAutoPlay(false);
+      goPrev();
+    }
+  });
+
+  /* 全局点击音效 */
+  document.addEventListener('click', () => { playClick(); }, true);
+
+  /* 首次交互启动音频 */
+  document.addEventListener('pointerdown', () => { initAudio(); }, { once: true });
+}
+
+/* ---------------- 缩放适配 ---------------- */
+function fitScreen(){
+  const s = Math.min(window.innerWidth / 1024, window.innerHeight / 576);
+  els.screen.style.transform = 'scale(' + s + ')';
+}
+window.addEventListener('resize', fitScreen);
+
+/* ---------------- 初始化 ---------------- */
+function init(){
+  fitScreen();
+  bindEvents();
+
+  els.crt.classList.toggle('hidden', !state.crt);
+
+  state.idx = 0;
+  updateTask();
+  updatePage();
+  renderLog(false);
+
+  els.btnAuto.querySelector('span').textContent = '自动播放';
+}
+
+init();
+</script>
+</body>
+</html>
